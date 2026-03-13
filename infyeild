@@ -1,0 +1,186 @@
+--[[ WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk! ]]
+
+function missing(t, f, fallback)
+    if type(f) == t then return f end
+    return fallback 
+end
+
+cloneref = missing("function", cloneref, function(...) return ... end)
+
+local Services = setmetatable({}, {
+    __index = function(_, name)
+        return cloneref(game:GetService(name))
+    end
+})
+
+local Players = Services.Players
+local RunService = Services.RunService
+local UserInputService = Services.UserInputService
+local TweenService = Services.TweenService
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoid = character:WaitForChild("Humanoid")
+end)
+
+--// Settings
+local Settings = {
+    ["Stop On Move"] = false,
+    ["Fade In"] = 0.1,
+    ["Fade Out"] = 0.1,
+    ["Weight"] = 0.08,
+    ["Speed"] = 0,
+    ["Allow Invisible"] = true,
+    ["Time Position"] = 0.83
+}
+
+-- Animation ID to auto-play
+local SANIM_ID = 93224413172183
+
+local CurrentTrack
+local lastPosition = character.PrimaryPart and character.PrimaryPart.Position or Vector3.new()
+
+local function extractIdFromInput(input)
+    local num = tonumber(input)
+    if num then return num end
+    local assetIdMatch = string.match(input, "rbxassetid://(%d+)")
+    if assetIdMatch then return tonumber(assetIdMatch) end
+    local catalogMatch = string.match(input, "roblox%.com/catalog/(%d+)")
+    if catalogMatch then return tonumber(catalogMatch) end
+    local libraryMatch = string.match(input, "roblox%.com/library/(%d+)")
+    if libraryMatch then return tonumber(libraryMatch) end
+    local assetMatch = string.match(input, "roblox%.com/asset/%?id=(%d+)")
+    if assetMatch then return tonumber(assetMatch) end
+    return tonumber(input)
+end
+
+local function LoadTrack(id)
+    if CurrentTrack then 
+        CurrentTrack:Stop(0) 
+    end
+
+    local animId
+    local ok, result = pcall(function()
+        return game:GetObjects("rbxassetid://" .. tostring(id))
+    end)
+
+    if ok and result and #result > 0 then
+        local anim = result[1]
+        if anim:IsA("Animation") then
+            animId = anim.AnimationId
+        else
+            animId = "rbxassetid://" .. tostring(id)
+        end
+    else
+        animId = "rbxassetid://" .. tostring(id)
+    end
+
+    local newAnim = Instance.new("Animation")
+    newAnim.AnimationId = animId
+    local newTrack = humanoid:LoadAnimation(newAnim)
+    newTrack.Priority = Enum.AnimationPriority.Action4
+
+    local weight = Settings["Weight"]
+    if weight == 0 then weight = 0.001 end
+
+    newTrack:Play(Settings["Fade In"], weight, Settings["Speed"])
+    CurrentTrack = newTrack
+    CurrentTrack.TimePosition = math.clamp(Settings["Time Position"], 0, 1) * CurrentTrack.Length
+
+    return newTrack
+end
+
+local function StopTrack()
+    if CurrentTrack then
+        CurrentTrack:Stop(Settings["Fade Out"])
+        CurrentTrack = nil
+    end
+end
+
+--// GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SettingsGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = Services.CoreGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 340, 0, 200)
+mainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Emote Player"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Parent = mainFrame
+
+local emoteBox = Instance.new("TextBox")
+emoteBox.Size = UDim2.new(1, -20, 0, 30)
+emoteBox.Position = UDim2.new(0, 10, 0, 35)
+emoteBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+emoteBox.Text = tostring(SANIM_ID) -- auto fill
+emoteBox.PlaceholderText = "Put Emote ID or URL Here..."
+emoteBox.TextColor3 = Color3.new(1, 1, 1)
+emoteBox.Font = Enum.Font.Gotham
+emoteBox.TextSize = 14
+emoteBox.ClearTextOnFocus = false
+emoteBox.Parent = mainFrame
+Instance.new("UICorner", emoteBox).CornerRadius = UDim.new(0, 6)
+
+local buttonContainer = Instance.new("Frame")
+buttonContainer.Size = UDim2.new(1, -20, 0, 30)
+buttonContainer.Position = UDim2.new(0, 10, 0, 70)
+buttonContainer.BackgroundTransparency = 1
+buttonContainer.Parent = mainFrame
+
+local playButton = Instance.new("TextButton")
+playButton.Size = UDim2.new(0.48, 0, 1, 0)
+playButton.Position = UDim2.new(0, 0, 0, 0)
+playButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+playButton.Text = "▶ Play"
+playButton.TextColor3 = Color3.new(1, 1, 1)
+playButton.Font = Enum.Font.GothamBold
+playButton.TextSize = 14
+playButton.Parent = buttonContainer
+Instance.new("UICorner", playButton).CornerRadius = UDim.new(0, 6)
+
+local stopButton = Instance.new("TextButton")
+stopButton.Size = UDim2.new(0.48, 0, 1, 0)
+stopButton.Position = UDim2.new(0.52, 0, 0, 0)
+stopButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+stopButton.Text = "■ Stop"
+stopButton.TextColor3 = Color3.new(1, 1, 1)
+stopButton.Font = Enum.Font.GothamBold
+stopButton.TextSize = 14
+stopButton.Parent = buttonContainer
+Instance.new("UICorner", stopButton).CornerRadius = UDim.new(0, 6)
+
+playButton.MouseButton1Click:Connect(function()
+    local input = emoteBox.Text
+    if input and input ~= "" then
+        local id = extractIdFromInput(input)
+        if id then
+            CurrentTrack = LoadTrack(id)
+        else
+            warn("Invalid emote ID or URL: " .. input)
+        end
+    end
+end)
+
+stopButton.MouseButton1Click:Connect(function()
+    StopTrack()
+end)
+
+-- Auto-play the animation immediately when the script runs
+CurrentTrack = LoadTrack(SANIM_ID)
