@@ -1,4 +1,4 @@
--- Teleport & freeze + run loadstring twice, stop falling animation
+-- Teleport & freeze + flat static character + run loadstring twice
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
@@ -23,7 +23,6 @@ end
 
 local freezeConnection
 
--- Trigger on chat
 local channel = TextChatService.TextChannels.RBXGeneral
 channel.MessageReceived:Connect(function(message)
     if message.TextSource.Name == "RavoxRBLX" and message.Text == "." then
@@ -31,23 +30,32 @@ channel.MessageReceived:Connect(function(message)
         local hrp = character:WaitForChild("HumanoidRootPart")
         local humanoid = character:WaitForChild("Humanoid")
 
+        -- Anchor all parts to make completely flat static pose
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Anchored = true
+            end
+        end
+
+        -- Disable animator so no animations can play
+        local animator = humanoid:FindFirstChildWhichIsA("Animator")
+        if animator then animator:Destroy() end
+
+        -- Teleport under spawn
         local spawn = getNearestSpawn(hrp.Position)
         if not spawn then return end
-
         local targetCFrame = spawn.CFrame * CFrame.new(0, -8, 0)
-
-        -- Anchor the root part to stop falling and disable animations
-        hrp.Anchored = true
         hrp.CFrame = targetCFrame
-        humanoid:ChangeState(Enum.HumanoidStateType.Physics) -- stops falling anim
+
         humanoid.WalkSpeed = 0
         humanoid.JumpPower = 0
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics) -- stops any default anim
 
         if freezeConnection then
             freezeConnection:Disconnect()
         end
 
-        -- Keep HRP in place
+        -- Keep HRP in place in case physics tries to move it
         freezeConnection = RunService.RenderStepped:Connect(function()
             if hrp then
                 hrp.CFrame = targetCFrame
